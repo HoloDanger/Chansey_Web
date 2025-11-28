@@ -21,9 +21,9 @@ let AgoraRTC: AgoraRTCType | null = null;
 
 // Agora Configuration
 const AGORA_CONFIG = {
-  appId: "1364f588b53c42baac5772751347347a",
-  token: null as string | null,
-  channelName: "consultation-channel",
+  appId: "a4bbf1d27589458d96d9bc8eaa6600e4",
+  token: "007eJxTYMj8v2S9rPREJ4E/thUzcg94PFqVWXR2VsRXF6VpvwX2JMgoMCSaJCWlGaYYmZtaWJqYWqRYmqVYJiVbpCYmmpkZGKSaVKZqZDYEMjK47kplZGSAQBCfl6GkKDMxPTW+KD8/N96QgQEAmWgi3Q==",
+  channelName: "triage_room_1",
 };
 
 export default function VideoCallApp() {
@@ -58,20 +58,24 @@ export default function VideoCallApp() {
         "user-published",
         async (user: IAgoraRTCRemoteUser, mediaType: MediaType) => {
           await client.current!.subscribe(user, mediaType);
-          console.log("Subscribe success");
+          console.log("✅ Remote user published:", mediaType);
+          console.log("Remote UID:", user.uid);
 
           if (mediaType === "video") {
             setRemoteUid(user.uid);
+            console.log("🎥 Remote video track received");
 
             setTimeout(() => {
               if (remoteVideoRef.current) {
                 user.videoTrack?.play(remoteVideoRef.current);
+                console.log("🎥 Playing remote video");
               }
             }, 100);
           }
 
           if (mediaType === "audio") {
             user.audioTrack?.play();
+            console.log("🔊 Playing remote audio");
           }
         }
       );
@@ -103,8 +107,12 @@ export default function VideoCallApp() {
       if (localVideoRef.current) {
         localVideoTrack.current.play(localVideoRef.current);
       }
+      
+      console.log("✅ Video call initialized successfully");
+      console.log("Channel:", AGORA_CONFIG.channelName);
+      console.log("Waiting for remote user to join...");
     } catch (error) {
-      console.error("Error initializing Agora:", error);
+      console.error("❌ Error initializing Agora:", error);
     }
   }, [isWeb]);
 
@@ -175,10 +183,12 @@ export default function VideoCallApp() {
   };
 
   const container: React.CSSProperties = {
-    background: "#fff",
+    background: "linear-gradient(135deg, #E8F5E9 0%, #E1BEE7 100%)",
     minHeight: "100vh",
+    display: "flex",
+    flexDirection: "column",
   };
-  const header: React.CSSProperties = { padding: "48px 24px 24px" };
+  const header: React.CSSProperties = { padding: "56px 24px 24px" };
   const headerRow: React.CSSProperties = {
     display: "flex",
     alignItems: "center",
@@ -190,69 +200,86 @@ export default function VideoCallApp() {
     gap: 12,
   };
   const phoneIcon: React.CSSProperties = {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    background: "linear-gradient(135deg,#7EFD94,#698DFE,#7F4EF0)",
+    background: "linear-gradient(135deg, #7EFD94 0%, #5DD47A 100%)",
     color: "#fff",
+    fontSize: 18,
+    boxShadow: "0 2px 8px rgba(126, 253, 148, 0.3)",
   };
   const videoArea: React.CSSProperties = {
     position: "relative",
-    padding: "0 24px 24px",
+    padding: "0 24px 32px",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
+    flex: 1,
   };
   const avatar: React.CSSProperties = {
-    width: 128,
-    height: 128,
-    borderRadius: 64,
+    width: 160,
+    height: 160,
+    borderRadius: 80,
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 24,
-    background: "linear-gradient(135deg,#7EFD94,#698DFE,#7F4EF0)",
+    background: "linear-gradient(135deg,#8B5CF6,#EC4899,#F59E0B)",
     color: "#fff",
-    boxShadow: "0 4px 8px rgba(0,0,0,0.2)",
+    fontSize: 48,
+    fontWeight: 600,
+    boxShadow: "0 8px 24px rgba(139, 92, 246, 0.4)",
+    border: "4px solid #fff",
   };
   const doctorName: React.CSSProperties = {
-    color: "#111827",
-    fontSize: 20,
-    fontWeight: 600,
-    marginBottom: 24,
+    color: "#1a1a1a",
+    fontSize: 28,
+    fontWeight: 700,
+    marginBottom: 12,
   };
-  const controlsWrap: React.CSSProperties = { padding: "0 24px 40px" };
+  const controlsWrap: React.CSSProperties = { 
+    padding: "0 24px 48px",
+    background: "rgba(255, 255, 255, 0.8)",
+    backdropFilter: "blur(10px)",
+    borderRadius: "32px 32px 0 0",
+    boxShadow: "0 -4px 16px rgba(0, 0, 0, 0.1)",
+  };
   const controlsRow: React.CSSProperties = {
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    gap: 32,
+    gap: 24,
+    paddingTop: 24,
   };
   const controlButton: React.CSSProperties = {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    background: "#f3f4f6",
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    background: "#fff",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
     border: "none",
     cursor: "pointer",
-    boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
+    fontSize: 28,
+    boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+    transition: "all 0.2s ease",
   };
   const activeButton: React.CSSProperties = {
-    background: "#ef4444",
+    background: "linear-gradient(135deg, #EF4444 0%, #DC2626 100%)",
     color: "#fff",
+    boxShadow: "0 4px 16px rgba(239, 68, 68, 0.4)",
   };
   const endButton: React.CSSProperties = { ...activeButton };
   const label: React.CSSProperties = {
     color: "#6b7280",
-    fontSize: 12,
+    fontSize: 13,
+    fontWeight: 500,
     textAlign: "center",
-    marginTop: 8,
+    marginTop: 10,
   };
 
   return (
@@ -319,10 +346,12 @@ export default function VideoCallApp() {
               ref={remoteVideoRef}
               style={{
                 width: "100%",
+                maxWidth: 600,
                 height: 420,
                 backgroundColor: "#000",
-                borderRadius: 16,
+                borderRadius: 20,
                 overflow: "hidden",
+                boxShadow: "0 8px 32px rgba(0, 0, 0, 0.2)",
               }}
             />
           ) : (
@@ -345,31 +374,37 @@ export default function VideoCallApp() {
           >
             <div style={avatar}>MS</div>
             <div style={doctorName}>Maria Santos</div>
+            <div style={{ 
+              fontSize: 15, 
+              color: "#666", 
+              marginBottom: 20,
+              fontWeight: 500
+            }}>
+              42 years old • Cardiac Emergency
+            </div>
             <div
               style={{
                 display: "flex",
                 alignItems: "center",
-                gap: 8,
+                gap: 12,
+                padding: "12px 24px",
+                background: "rgba(139, 92, 246, 0.1)",
+                borderRadius: 24,
                 marginBottom: 8,
               }}
             >
               <div
                 style={{
-                  width: 32,
-                  height: 32,
-                  borderRadius: 16,
-                  background: "#f3f4f6",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  color: "#6b7280",
+                  width: 12,
+                  height: 12,
+                  borderRadius: 6,
+                  background: "#8B5CF6",
+                  animation: "pulse 1.5s ease-in-out infinite",
                 }}
-              >
-                ⏱️
+              />
+              <div style={{ color: "#8B5CF6", fontSize: 14, fontWeight: 600 }}>
+                Waiting to connect...
               </div>
-            </div>
-            <div style={{ color: "#6b7280", fontSize: 12 }}>
-              Waiting to connect...
             </div>
           </div>
         )}
@@ -379,14 +414,16 @@ export default function VideoCallApp() {
             ref={localVideoRef}
             style={{
               position: "absolute",
-              top: 20,
-              right: 20,
-              width: 120,
-              height: 160,
+              top: remoteUid ? 24 : "50%",
+              right: remoteUid ? 48 : "50%",
+              transform: remoteUid ? "none" : "translate(50%, -50%)",
+              width: remoteUid ? 140 : 280,
+              height: remoteUid ? 180 : 360,
               backgroundColor: "#1f2937",
-              borderRadius: 12,
-              border: "2px solid #ffffff",
+              borderRadius: 16,
+              border: "3px solid #ffffff",
               overflow: "hidden",
+              boxShadow: "0 4px 16px rgba(0, 0, 0, 0.3)",
             }}
           />
         )}

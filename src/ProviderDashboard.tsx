@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { useTheme } from "./context/ThemeContext";
 
 interface PatientCard {
@@ -18,6 +19,7 @@ interface PatientCard {
 }
 
 export default function ProviderDashboard() {
+  const navigate = useNavigate();
   const { theme, isDark } = useTheme();
   const [isAvailable, setIsAvailable] = useState(true);
   const [selectedPatient, setSelectedPatient] = useState<PatientCard | null>(
@@ -63,13 +65,14 @@ export default function ProviderDashboard() {
 
         for (const item of data) {
           console.log("   Processing item:", item);
-          
+
           // Parse time or use current time
           const formattedTime = item.time || "Just now";
-          
+
           // Check if urgency is pending/processing
-          const isPending = item.urgency === "Pending..." || item.urgency === "pending";
-          
+          const isPending =
+            item.urgency === "Pending..." || item.urgency === "pending";
+
           // Map urgency from API (can be "High", "Low", "Medium", "Pending...", etc.)
           let urgencyLevel: "High" | "Medium" | "Low";
           if (isPending) {
@@ -81,33 +84,56 @@ export default function ProviderDashboard() {
           } else {
             urgencyLevel = "Medium";
           }
-          
+
+          // Map API fields to patient card format
+          // API provides: name, urgency, category, summary, specialist, suggested_action, time
           const patient = {
             id: item.sessionId || item.userId,
             userId: item.userId,
             sessionId: item.sessionId,
             name: item.name || "Patient",
-            age: 35, // Default age since not in API response
+            age: 35, // Default age (not in API)
             urgency: urgencyLevel,
             timestamp: formattedTime,
-            specialties: item.category ? [item.category] : ["General"],
+            specialties:
+              item.specialist && item.specialist !== "—"
+                ? [item.specialist]
+                : item.category && item.category !== "—"
+                ? [item.category]
+                : ["General"],
+            symptoms:
+              item.summary && item.summary !== "Waiting for voice input..."
+                ? item.summary
+                : undefined,
+            urgencyScore:
+              urgencyLevel === "High"
+                ? "8/10"
+                : urgencyLevel === "Medium"
+                ? "5/10"
+                : "2/10",
+            urgencyDescription:
+              item.summary && item.summary !== "Waiting for voice input..."
+                ? item.summary
+                : undefined,
+            suggestedActions: item.suggested_action
+              ? [item.suggested_action]
+              : undefined,
             status: isPending ? "pending" : "completed",
           };
-          
+
           console.log("   Created patient card:", patient);
           patients.push(patient);
-
-          // If pending, try to fetch full details
-          if (isPending && item.sessionId) {
-            console.log(`⏳ Patient ${item.name} is pending, will poll for updates`);
-          }
         }
 
-        console.log(`✅ Successfully loaded ${patients.length} patient(s) from queue API`);
+        console.log(
+          `✅ Successfully loaded ${patients.length} patient(s) from queue API`
+        );
         return patients;
       }
 
-      console.log("⚠️ API returned empty array or unexpected format, using mock data");
+      console.log(
+        "⚠️ API returned empty array or unexpected format, using mock data"
+      );
       console.log("   Data:", data);
       return getMockData();
     } catch (error) {
@@ -571,19 +597,32 @@ export default function ProviderDashboard() {
                 marginBottom: 14,
               }}
             >
-              <div style={{
-                ...badgeStyle,
-                color: patient.urgency === "High" ? "#FE805D" : 
-                       patient.urgency === "Low" ? "#7EFD94" : "#FFA726"
-              }}>
+              <div
+                style={{
+                  ...badgeStyle,
+                  color:
+                    patient.urgency === "High"
+                      ? "#FE805D"
+                      : patient.urgency === "Low"
+                      ? "#7EFD94"
+                      : "#FFA726",
+                }}
+              >
                 <span role="img" aria-label="urgency" style={{ fontSize: 14 }}>
-                  {patient.urgency === "High" ? "⚠️" : 
-                   patient.urgency === "Low" ? "✅" : "⏱️"}
+                  {patient.urgency === "High"
+                    ? "⚠️"
+                    : patient.urgency === "Low"
+                    ? "✅"
+                    : "⏱️"}
                 </span>
                 <span style={{ fontSize: 13 }}>
-                  {patient.status === "pending" ? "Pending..." :
-                   patient.urgency === "High" ? "Highly Urgent" :
-                   patient.urgency === "Low" ? "Low Priority" : "Medium Priority"}
+                  {patient.status === "pending"
+                    ? "Pending..."
+                    : patient.urgency === "High"
+                    ? "Highly Urgent"
+                    : patient.urgency === "Low"
+                    ? "Low Priority"
+                    : "Medium Priority"}
                 </span>
               </div>
               <div style={{ fontSize: 11, color: "#aaa" }}>
@@ -659,19 +698,32 @@ export default function ProviderDashboard() {
                 borderBottom: "1px solid #f0f0f0",
               }}
             >
-              <div style={{
-                ...badgeStyle,
-                color: selectedPatient.urgency === "High" ? "#FE805D" : 
-                       selectedPatient.urgency === "Low" ? "#7EFD94" : "#FFA726"
-              }}>
+              <div
+                style={{
+                  ...badgeStyle,
+                  color:
+                    selectedPatient.urgency === "High"
+                      ? "#FE805D"
+                      : selectedPatient.urgency === "Low"
+                      ? "#7EFD94"
+                      : "#FFA726",
+                }}
+              >
                 <span role="img" aria-label="urgency" style={{ fontSize: 14 }}>
-                  {selectedPatient.urgency === "High" ? "⚠️" : 
-                   selectedPatient.urgency === "Low" ? "✅" : "⏱️"}
+                  {selectedPatient.urgency === "High"
+                    ? "⚠️"
+                    : selectedPatient.urgency === "Low"
+                    ? "✅"
+                    : "⏱️"}
                 </span>
                 <span style={{ fontSize: 13 }}>
-                  {selectedPatient.status === "pending" ? "Pending Analysis..." :
-                   selectedPatient.urgency === "High" ? "High Urgency" :
-                   selectedPatient.urgency === "Low" ? "Low Urgency" : "Medium Urgency"}
+                  {selectedPatient.status === "pending"
+                    ? "Pending Analysis..."
+                    : selectedPatient.urgency === "High"
+                    ? "High Urgency"
+                    : selectedPatient.urgency === "Low"
+                    ? "Low Urgency"
+                    : "Medium Urgency"}
                 </span>
               </div>
               <button
@@ -837,6 +889,7 @@ export default function ProviderDashboard() {
               </div>
 
               <button
+                onClick={() => navigate("/video")}
                 style={{
                   width: "100%",
                   background:
