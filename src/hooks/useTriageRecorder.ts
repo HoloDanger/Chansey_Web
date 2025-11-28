@@ -29,6 +29,9 @@ export function useTriageRecorder() {
     // Simulate processing and a result
     timerRef.current = window.setTimeout(() => {
       const now = new Date();
+      const sessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      const userId = `user_${Math.random().toString(36).substr(2, 9)}`;
+      
       const result: TriageResult = {
         urgency: "High",
         symptoms:
@@ -44,13 +47,38 @@ export function useTriageRecorder() {
         specialties: ["Neurological", "Neurologist"],
         timestamp: now.toISOString(),
       };
+      
+      // Create patient card with all required fields for ProviderDashboard
+      const patientCard = {
+        id: sessionId,
+        userId: userId,
+        sessionId: sessionId,
+        name: "New Patient",
+        age: 35,
+        urgency: result.urgency,
+        timestamp: now.toISOString(),
+        specialties: result.specialties,
+        symptoms: result.symptoms,
+        urgencyScore: result.urgencyScore,
+        urgencyDescription: result.urgencyDescription,
+        suggestedActions: result.suggestedActions,
+        status: "pending", // Will be updated by API polling
+      };
+      
+      console.log("🔵 Triage completed! Generated IDs:");
+      console.log("  userId:", userId);
+      console.log("  sessionId:", sessionId);
+      console.log("  Full patient card:", patientCard);
+      console.log("  API URL:", `https://4lfbz4mx6rede2zhzllbptkkjq0myzfs.lambda-url.us-east-1.on.aws?userId=${userId}&sessionId=${sessionId}`);
+      
       try {
         window.localStorage.setItem(
           "latest_triage_result",
-          JSON.stringify(result)
+          JSON.stringify(patientCard)
         );
-      } catch {
-        /* ignore storage write errors */
+        console.log("✅ Saved to localStorage: latest_triage_result");
+      } catch (error) {
+        console.error("❌ Failed to save to localStorage:", error);
       }
       setLastResult(result);
       setStatus("idle");

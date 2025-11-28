@@ -26,14 +26,98 @@ export default function ProviderDashboard() {
   const [patientQueue, setPatientQueue] = useState<PatientCard[]>([]);
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [isLoading, setIsLoading] = useState(false);
+  const [sortBy, setSortBy] = useState<"urgency" | "time">("urgency");
 
   // API Configuration
+  // Queue API: GET /queue - Returns list of all patients (from any device)
+  // Status API: GET /?userId=X&sessionId=Y - Returns individual patient status
   const STATUS_CHECK_URL =
     "https://4lfbz4mx6rede2zhzllbptkkjq0myzfs.lambda-url.us-east-1.on.aws";
-  const POLL_INTERVAL = 2000; // 2 seconds
+  const QUEUE_API_URL =
+    "https://4lfbz4mx6rede2zhzllbptkkjq0myzfs.lambda-url.us-east-1.on.aws/queue";
+  const POLL_INTERVAL = 2000; // 2 seconds for individual patient updates
+  const QUEUE_POLL_INTERVAL = 3000; // 3 seconds for full queue refresh  // Fetch and build patient queue from API
+  const fetchPatientQueue = async () => {
+    try {
+      console.log("🔄 Fetching patient queue from API...");
+      console.log("   URL:", QUEUE_API_URL);
+      const response = await fetch(QUEUE_API_URL);
 
-  // Load patient data helper function
-  const loadPatientData = async () => {
+      console.log("   Response status:", response.status, response.statusText);
+
+      if (!response.ok) {
+        console.log("⚠️ Queue API not available, using mock data");
+        console.log("   Status:", response.status);
+        return getMockData();
+      }
+
+      const data = await response.json();
+      console.log("✅ Received data from API:", data);
+      console.log("   Data type:", typeof data);
+      console.log("   Is array:", Array.isArray(data));
+
+      // API returns array directly: [{ userId, sessionId, name, urgency, time, category }]
+      if (Array.isArray(data) && data.length > 0) {
+        console.log(`📋 Processing ${data.length} patient(s) from API...`);
+        const patients: PatientCard[] = [];
+
+        for (const item of data) {
+          console.log("   Processing item:", item);
+          
+          // Parse time or use current time
+          const formattedTime = item.time || "Just now";
+          
+          // Check if urgency is pending/processing
+          const isPending = item.urgency === "Pending..." || item.urgency === "pending";
+          
+          // Map urgency from API (can be "High", "Low", "Medium", "Pending...", etc.)
+          let urgencyLevel: "High" | "Medium" | "Low";
+          if (isPending) {
+            urgencyLevel = "Medium";
+          } else if (item.urgency?.toLowerCase() === "high") {
+            urgencyLevel = "High";
+          } else if (item.urgency?.toLowerCase() === "low") {
+            urgencyLevel = "Low";
+          } else {
+            urgencyLevel = "Medium";
+          }
+          
+          const patient = {
+            id: item.sessionId || item.userId,
+            userId: item.userId,
+            sessionId: item.sessionId,
+            name: item.name || "Patient",
+            age: 35, // Default age since not in API response
+            urgency: urgencyLevel,
+            timestamp: formattedTime,
+            specialties: item.category ? [item.category] : ["General"],
+            status: isPending ? "pending" : "completed",
+          };
+          
+          console.log("   Created patient card:", patient);
+          patients.push(patient);
+
+          // If pending, try to fetch full details
+          if (isPending && item.sessionId) {
+            console.log(`⏳ Patient ${item.name} is pending, will poll for updates`);
+          }
+        }
+
+        console.log(`✅ Successfully loaded ${patients.length} patient(s) from queue API`);
+        return patients;
+      }
+
+      console.log("⚠️ API returned empty array or unexpected format, using mock data");
+      console.log("   Data:", data);
+      return getMockData();
+    } catch (error) {
+      console.error("❌ Error fetching patient queue:", error);
+      return getMockData();
+    }
+  };
+
+  // Helper to get mock data (for development/fallback)
+  const getMockData = (): PatientCard[] => {
     const mockData: PatientCard[] = [
       {
         id: "1",
@@ -56,7 +140,7 @@ export default function ProviderDashboard() {
       },
     ];
 
-    // Check for latest triage result
+    // Also check localStorage for local web triage results
     try {
       const latestResult =
         typeof window !== "undefined"
@@ -64,29 +148,50 @@ export default function ProviderDashboard() {
           : null;
       if (latestResult) {
         const newPatient = JSON.parse(latestResult);
+        console.log("🟢 Found patient in localStorage:", newPatient);
+
         const timestamp = new Date(newPatient.timestamp);
         const now = new Date();
         const diffSeconds = Math.floor(
           (now.getTime() - timestamp.getTime()) / 1000
         );
+        newPatient.timestamp = formatTimestamp(diffSeconds);
 
-        if (diffSeconds < 60) {
-          newPatient.timestamp = `${diffSeconds} secs ago`;
-        } else if (diffSeconds < 3600) {
-          newPatient.timestamp = `${Math.floor(diffSeconds / 60)} mins ago`;
-        } else {
-          newPatient.timestamp = `${Math.floor(diffSeconds / 3600)} hours ago`;
-        }
-
-        // Add to queue at the beginning
         mockData.unshift(newPatient);
       }
     } catch (error) {
-      console.error("Error loading triage result:", error);
+      console.error("❌ Error loading localStorage:", error);
     }
 
-    setPatientQueue(mockData);
+    return mockData;
   };
+
+  // Helper to format timestamp
+  const formatTimestamp = (diffSeconds: number): string => {
+    if (diffSeconds < 60) {
+      return `${diffSeconds} secs ago`;
+    } else if (diffSeconds < 3600) {
+      return `${Math.floor(diffSeconds / 60)} mins ago`;
+    } else {
+      return `${Math.floor(diffSeconds / 3600)} hours ago`;
+    }
+  };
+
+  // Load patient data
+  const loadPatientData = async () => {
+    const patients = await fetchPatientQueue();
+    setPatientQueue(patients);
+  };
+
+  // Sort patients based on selected criteria
+  const sortedPatientQueue = [...patientQueue].sort((a, b) => {
+    if (sortBy === "urgency") {
+      const urgencyOrder = { High: 0, Medium: 1, Low: 2 };
+      return urgencyOrder[a.urgency] - urgencyOrder[b.urgency];
+    }
+    // Sort by time (most recent first)
+    return 0; // Already in correct order from mockData
+  });
 
   // Fetch patient status from API
   const fetchPatientStatus = async (userId: string, sessionId: string) => {
@@ -115,13 +220,27 @@ export default function ProviderDashboard() {
           patient.userId && patient.sessionId && patient.status !== "completed"
       );
 
+      if (pendingPatients.length > 0) {
+        console.log(
+          `🔄 Polling ${pendingPatients.length} pending patient(s)...`
+        );
+      }
+
       for (const patient of pendingPatients) {
+        console.log(
+          `  → Checking status for patient ${patient.name} (userId: ${patient.userId}, sessionId: ${patient.sessionId})`
+        );
+
         const updatedData = await fetchPatientStatus(
           patient.userId!,
           patient.sessionId!
         );
 
         if (updatedData) {
+          console.log(
+            `  ✅ Received updated data for ${patient.name}:`,
+            updatedData
+          );
           // Update patient with API data
           setPatientQueue((prev) =>
             prev.map((p) =>
@@ -141,6 +260,8 @@ export default function ProviderDashboard() {
                 : p
             )
           );
+        } else {
+          console.log(`  ⏳ No update yet for ${patient.name} (still pending)`);
         }
       }
     };
@@ -155,7 +276,19 @@ export default function ProviderDashboard() {
   }, [patientQueue]);
 
   useEffect(() => {
+    // Initial load
     setTimeout(() => loadPatientData(), 0);
+
+    // Poll for new patients from API (detects mobile app submissions)
+    const queueInterval = setInterval(() => {
+      console.log("⏰ Refreshing patient queue...");
+      loadPatientData();
+    }, QUEUE_POLL_INTERVAL);
+
+    return () => {
+      clearInterval(queueInterval);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const providerInfo = {
@@ -223,7 +356,7 @@ export default function ProviderDashboard() {
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <div
               style={{
-                width: 56,
+                width: 200,
                 height: 56,
                 borderRadius: 28,
                 background: "#e0e0e0",
@@ -371,28 +504,54 @@ export default function ProviderDashboard() {
           marginTop: 20,
           marginBottom: 12,
           textAlign: "left",
+          display: "flex",
+          gap: 12,
+          alignItems: "center",
         }}
       >
+        <span style={{ fontSize: 14, color: "#999" }}>Sort By:</span>
         <button
+          onClick={() => setSortBy("urgency")}
           style={{
             display: "inline-flex",
             alignItems: "center",
-            gap: 8,
+            gap: 6,
             border: "none",
-            background: "transparent",
-            color: "#999",
+            background: sortBy === "urgency" ? "#8B5CF6" : "transparent",
+            color: sortBy === "urgency" ? "#fff" : "#999",
             cursor: "pointer",
-            fontSize: 14,
-            padding: 0,
+            fontSize: 13,
+            padding: "6px 12px",
+            borderRadius: 16,
+            fontWeight: 600,
+            transition: "all 0.2s",
           }}
         >
-          <span style={{ fontSize: 16 }}>⚙️</span>
-          <span>Sort By</span>
+          Urgency
+        </button>
+        <button
+          onClick={() => setSortBy("time")}
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 6,
+            border: "none",
+            background: sortBy === "time" ? "#8B5CF6" : "transparent",
+            color: sortBy === "time" ? "#fff" : "#999",
+            cursor: "pointer",
+            fontSize: 13,
+            padding: "6px 12px",
+            borderRadius: 16,
+            fontWeight: 600,
+            transition: "all 0.2s",
+          }}
+        >
+          Time
         </button>
       </div>
 
       <div style={{ padding: "0 20px" }}>
-        {patientQueue.map((patient) => (
+        {sortedPatientQueue.map((patient) => (
           <div
             key={patient.id}
             style={{
@@ -412,11 +571,20 @@ export default function ProviderDashboard() {
                 marginBottom: 14,
               }}
             >
-              <div style={badgeStyle}>
-                <span role="img" aria-label="warning" style={{ fontSize: 14 }}>
-                  ⚠️
+              <div style={{
+                ...badgeStyle,
+                color: patient.urgency === "High" ? "#FE805D" : 
+                       patient.urgency === "Low" ? "#7EFD94" : "#FFA726"
+              }}>
+                <span role="img" aria-label="urgency" style={{ fontSize: 14 }}>
+                  {patient.urgency === "High" ? "⚠️" : 
+                   patient.urgency === "Low" ? "✅" : "⏱️"}
                 </span>
-                <span style={{ fontSize: 13 }}>Highly Urgent</span>
+                <span style={{ fontSize: 13 }}>
+                  {patient.status === "pending" ? "Pending..." :
+                   patient.urgency === "High" ? "Highly Urgent" :
+                   patient.urgency === "Low" ? "Low Priority" : "Medium Priority"}
+                </span>
               </div>
               <div style={{ fontSize: 11, color: "#aaa" }}>
                 {patient.timestamp}
@@ -491,11 +659,20 @@ export default function ProviderDashboard() {
                 borderBottom: "1px solid #f0f0f0",
               }}
             >
-              <div style={badgeStyle}>
-                <span role="img" aria-label="warning" style={{ fontSize: 14 }}>
-                  ⚠️
+              <div style={{
+                ...badgeStyle,
+                color: selectedPatient.urgency === "High" ? "#FE805D" : 
+                       selectedPatient.urgency === "Low" ? "#7EFD94" : "#FFA726"
+              }}>
+                <span role="img" aria-label="urgency" style={{ fontSize: 14 }}>
+                  {selectedPatient.urgency === "High" ? "⚠️" : 
+                   selectedPatient.urgency === "Low" ? "✅" : "⏱️"}
                 </span>
-                <span style={{ fontSize: 13 }}>High Urgency</span>
+                <span style={{ fontSize: 13 }}>
+                  {selectedPatient.status === "pending" ? "Pending Analysis..." :
+                   selectedPatient.urgency === "High" ? "High Urgency" :
+                   selectedPatient.urgency === "Low" ? "Low Urgency" : "Medium Urgency"}
+                </span>
               </div>
               <button
                 onClick={() => setSelectedPatient(null)}
